@@ -1,153 +1,97 @@
-# TradeFlow 🚀
+# TradeFlow
 
-**Trading Automation Platform**
+A modern, full-stack workflow automation platform for trading, built with TypeScript, React, Express, and MongoDB.
 
-TradeFlow is a workflow-based trading automation platform that enables users to design and execute trading strategies through configurable pipelines, event-driven triggers, and integrations with external trading APIs.
+## Features
 
-The system allows traders and developers to automate complex trading workflows, monitor execution in real time, and manage strategy pipelines through an interactive dashboard.
+- **Workflow Automation**: Build, visualize, and execute trading workflows with a drag-and-drop interface.
+- **Modular Node System**: Easily add triggers (price, timer) and actions (exchange integrations) to your workflows.
+- **User Authentication**: Secure signup/login with JWT-based authentication.
+- **Exchange Integrations**: Connect to multiple exchanges (Hyperliquid, Backpack, Lighter) and manage API credentials.
+- **Execution Engine**: Robust backend engine to process and execute workflows in real time.
+- **Responsive UI**: Modern, mobile-friendly frontend built with React, Vite, Tailwind CSS, and shadcn/ui.
+- **Type-Safe Shared Types**: Common types and interfaces shared between frontend and backend for reliability.
 
----
-
-## ✨ Features
-
-* ⚙️ Configurable trading pipelines
-* 🔔 Event-driven trading triggers
-* 📊 Real-time monitoring dashboard
-* 🔗 Integration with external trading APIs
-* 📈 Strategy execution tracking
-* 🧩 Modular workflow architecture
-* ⚡ High-performance backend orchestration
-
----
-
-## 🏗 System Architecture
-
-TradeFlow follows a **full-stack architecture**:
-
-Frontend
-React.js dashboard for managing trading workflows and monitoring strategy execution.
-
-Backend
-Node.js and Express.js services responsible for pipeline orchestration, API communication, and event processing.
-
-External Services
-Trading APIs and third-party market data providers.
-
-Database
-Stores pipeline configurations, execution logs, and strategy data.
+## Project Structure
 
 ```
-User → React Dashboard → REST API → Backend Services → Trading APIs
-                                     ↓
-                                  Database
+TradeFlow/
+├── backend/         # Express API, workflow engine, MongoDB models
+│   └── src/
+│       ├── db/models/      # Mongoose models (User, Workflow, etc.)
+│       ├── executor/       # Workflow execution engine & services
+│       ├── middleware/     # Auth middleware
+│       ├── routes/         # Modular API routes (auth, user, workflow, executor)
+│       └── index.ts        # App entry point
+├── frontend/        # React app (Vite, TypeScript, Tailwind)
+│   └── src/
+│       ├── workflow/       # Workflow builder, nodes, sheets
+│       ├── pages/          # App pages (Dashboard, Login, etc.)
+│       ├── components/     # UI components (shadcn/ui)
+│       └── lib/            # API utilities
+├── common/          # Shared types/interfaces (TypeScript only)
+│   └── src/index.ts
+├── package.json     # Root scripts and dependencies
+├── turbo.json       # Monorepo build config
+└── ...
 ```
 
----
+## Getting Started
 
-## 🛠 Tech Stack
+### Prerequisites
+- Node.js 18+
+- npm 9+
+- MongoDB (local or remote)
 
-### Frontend
+### Installation
 
-* React.js
-* Tailwind CSS
-* Axios
+1. **Clone the repository:**
+   ```sh
+   git clone https://github.com/AerthSaraogi/TradeFlow.git
+   cd TradeFlow
+   ```
+2. **Install dependencies:**
+   ```sh
+   npm install
+   ```
+3. **Set up environment variables:**
+   - Copy `.env.example` to `.env` in both `backend/` and `frontend/` (if present) and fill in required values (e.g., `MONGODB_URI`, `JWT_SECRET`).
 
-### Backend
+### Running the App
 
-* Node.js
-* Express.js
-* REST APIs
-
-### Database
-
-* PostgreSQL / MongoDB
-
-### Tools
-
-* Git
-* GitHub
-* Postman
-
----
-
-## ⚙️ Installation
-
-### 1️⃣ Clone the repository
-
-```
-git clone https://github.com/YOUR_USERNAME/tradeflow.git
-cd tradeflow
-```
-
-### 2️⃣ Install dependencies
-
-Frontend
-
-```
-cd frontend
-npm install
-```
-
-Backend
-
-```
+#### Backend
+```sh
 cd backend
-npm install
+npm run dev
 ```
+- Runs Express server on `http://localhost:3001` (default)
 
-### 3️⃣ Run the application
-
-Start backend server
-
+#### Frontend
+```sh
+cd frontend
+npm run dev
 ```
-npm start
-```
+- Runs React app on `http://localhost:5173` (default)
 
-Start frontend
+### Monorepo Scripts
+- `npm run dev` (from root): Starts both frontend and backend in parallel (if configured)
+- `npm run build` (from root): Builds all packages
 
-```
-npm start
-```
+## API Overview
+- **Auth**: `/api/auth/signup`, `/api/auth/login`
+- **User**: `/api/user/me`, `/api/user/credentials`
+- **Workflow**: `/api/workflow/` (CRUD)
+- **Executor**: `/api/executor/` (run workflows)
+
+## Contributing
+1. Fork the repo and create your branch from `main`.
+2. Make your changes and add tests if applicable.
+3. Run `npm run lint` and `npm test` to ensure code quality.
+4. Submit a pull request.
+
+## License
+MIT
 
 ---
 
-## 📊 Example Use Case
-
-1. User creates a trading strategy pipeline.
-2. Event trigger detects market conditions.
-3. Backend processes the trigger.
-4. Trade order is sent to external trading API.
-5. Dashboard displays execution results in real time.
-
----
-
-## 📸 Screenshots
-
-Add screenshots here
-
-* Trading Dashboard
-* Pipeline Builder
-* Strategy Monitoring Page
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Open a Pull Request
-
----
-
-## 📬 Contact
-
-**Aerth Saraogi**
-
-LinkedIn
-https://www.linkedin.com/in/aerth-saraogi/
-
-Email
-[aerthsaraogi9@gmail.com](mailto:aerthsaraogi9@gmail.com)
+**TradeFlow** is an open-source project by [Aerth Saraogi](https://github.com/AerthSaraogi). Contributions and feedback are welcome!
