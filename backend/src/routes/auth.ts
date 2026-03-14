@@ -1,8 +1,10 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
+
 import { UserModel } from "../db/models/User.js";
 import { JWT_SECRET } from "../middleware/auth.js";
+import type { SignupRequest, LoginRequest, AuthResponse } from "@tradeflow/common";
 
 const router = Router();
 

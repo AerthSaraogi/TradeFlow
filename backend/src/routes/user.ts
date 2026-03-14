@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { UserModel } from "../db/models/User.js";
+
+
 import { authenticateToken } from "../middleware/auth.js";
+import type { UpdateUserRequest } from "@tradeflow/common";
 
 const router = Router();
 
