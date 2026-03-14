@@ -1,9 +1,5 @@
 import { Handle, Position } from "@xyflow/react";
-
-export type PriceTriggerNodeMetadata = {
-    asset: string;
-    price: number;
-};
+import type { PriceTriggerNodeMetadata } from "@tradeflow/common";
 export function PriceTrigger({ data, isConnectable }: {
     data: {
         metadata: PriceTriggerNodeMetadata

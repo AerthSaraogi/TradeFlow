@@ -1,47 +1,40 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ReactFlow, applyNodeChanges, applyEdgeChanges, addEdge, Background, BackgroundVariant, Controls } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, applyNodeChanges, applyEdgeChanges, addEdge, Background, BackgroundVariant, Controls, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useSearchParams, Link } from 'react-router-dom';
-import { TriggerSheet } from './TriggerSheet';
-import { PriceTrigger, type PriceTriggerNodeMetadata } from "@/nodes/triggers/PriceTrigger";
-import { Timer, type TimerNodeMetadata } from "@/nodes/triggers/Timer";
-import { Lighter, type TradingMetadata } from '@/nodes/action/Lighter';
-import { ActionSheet } from './ActionSheet';
-import { Hyperliquid } from '@/nodes/action/HyperLiquid';
-import { Backpack } from '@/nodes/action/BackPack';
+import { useSearchParams, useParams, Link, useNavigate } from 'react-router-dom';
+import type { WorkflowNode, WorkflowEdge, NodeKind, NodeMetadata, TriggerType, ActionType } from "@tradeflow/common";
+import { TriggerSheet } from '@/workflow/TriggerSheet';
+import { PriceTrigger } from "@/workflow/nodes/PriceTrigger";
+import { Timer } from "@/workflow/nodes/Timer";
+import { Lighter } from '@/workflow/nodes/Lighter';
+import { ActionSheet } from '@/workflow/ActionSheet';
+import { Hyperliquid } from '@/workflow/nodes/HyperLiquid';
+import { Backpack } from '@/workflow/nodes/BackPack';
+import { createWorkflow, updateWorkflow, fetchWorkflow, getStoredUser, logout } from '@/lib/api';
 
 const nodeTypes = {
-    "price-trigger": PriceTrigger,
-    "timer": Timer,
+  "price-trigger": PriceTrigger,
+  "timer": Timer,
   "lighter": Lighter,
   "hyperliquid": Hyperliquid,
   "backpack": Backpack,
-}
-
-export type TriggerType = "action" | "trigger";
-export type NodeKind = "price-trigger" |"timer" | "hyperliquid" | "backpack" | "lighter";
-interface NodeType {
-  type: NodeKind;
-  data:{
-    kind: TriggerType;
-    metadata: NodeMetadata;
-  }
-  id: string, position:{ x:number, y:number};
-}
-export type NodeMetadata = TradingMetadata | PriceTriggerNodeMetadata | TimerNodeMetadata ;
-interface Edge {
-    id: string;
-    source: string;
-    target: string;
-}  
-export default function CreateWorkflow() {
+};  
+function CreateWorkflowInner() {
   const [searchParams] = useSearchParams();
-  const flowName = searchParams.get('name') || 'Untitled Workflow';
+  const { id: paramId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const user = getStoredUser();
+
+  const [flowName, setFlowName] = useState(searchParams.get('name') || 'Untitled Workflow');
+  const [workflowDbId, setWorkflowDbId] = useState<string | null>(paramId || null);
+  const [status, setStatus] = useState("Paused");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes] = useState<NodeType[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
-  const [showTriggerSheet, setShowTriggerSheet] = useState(true);
+  const [nodes, setNodes] = useState<WorkflowNode[]>([]);
+  const [edges, setEdges] = useState<WorkflowEdge[]>([]);
+  const [showTriggerSheet, setShowTriggerSheet] = useState(!paramId);
   const [selectAction, setSelectAction] = useState<{
     position:{
       x:number,
@@ -49,6 +42,69 @@ export default function CreateWorkflow() {
     },
     startingNodeId: string,
   }|null>(null);
+
+  // Load existing workflow when editing
+  useEffect(() => {
+    if (paramId) {
+      fetchWorkflow(paramId)
+        .then((wf) => {
+          setFlowName(wf.name);
+          setNodes(wf.nodes || []);
+          setEdges(wf.edges || []);
+          setStatus(wf.status || "Paused");
+          setWorkflowDbId(wf.id);
+          setShowTriggerSheet(false);
+        })
+        .catch(() => navigate("/dashboard"));
+    }
+  }, [paramId, navigate]);
+
+  const showToast = (msg: string) => {
+    setSaveMsg(msg);
+    setTimeout(() => setSaveMsg(""), 2500);
+  };
+
+  const handleSaveDraft = async () => {
+    setSaving(true);
+    try {
+      if (workflowDbId) {
+        await updateWorkflow(workflowDbId, { name: flowName, nodes, edges, status: "Paused" });
+      } else {
+        const res = await createWorkflow({ name: flowName, nodes, edges });
+        setWorkflowDbId(res.workflow.id);
+      }
+      setStatus("Paused");
+      showToast("✓ Draft saved!");
+    } catch {
+      showToast("Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeploy = async () => {
+    setSaving(true);
+    try {
+      if (workflowDbId) {
+        await updateWorkflow(workflowDbId, { name: flowName, nodes, edges, status: "Active" });
+      } else {
+        const res = await createWorkflow({ name: flowName, nodes, edges });
+        setWorkflowDbId(res.workflow.id);
+        await updateWorkflow(res.workflow.id, { status: "Active" });
+      }
+      setStatus("Active");
+      showToast("Deployed! 🚀");
+    } catch {
+      showToast("Deploy failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
  
   const onNodesChange = useCallback(
     (changes: any) => setNodes((nodesSnapshot) => applyNodeChanges(changes, nodesSnapshot)),
@@ -62,18 +118,18 @@ export default function CreateWorkflow() {
     (params: any) => setEdges((edgesSnapshot) => addEdge(params, edgesSnapshot)),
     [],
   );
-  const POSITION_OFFSET = 50;
-  const onConnectEnd = useCallback((_params: any, connectionInfo: any) => {
+  const { screenToFlowPosition } = useReactFlow();
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, connectionInfo: any) => {
     if (!connectionInfo.isValid) {
+      const clientX = 'changedTouches' in event ? event.changedTouches[0].clientX : (event as MouseEvent).clientX;
+      const clientY = 'changedTouches' in event ? event.changedTouches[0].clientY : (event as MouseEvent).clientY;
+      const position = screenToFlowPosition({ x: clientX, y: clientY });
       setSelectAction({
         startingNodeId: connectionInfo.fromNode.id,
-        position: {
-          x: connectionInfo.from.x +POSITION_OFFSET,
-          y: connectionInfo.from.y + POSITION_OFFSET,
-        },
-      })
+        position,
+      });
     }
-  }, []);
+  }, [screenToFlowPosition]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -87,6 +143,13 @@ export default function CreateWorkflow() {
  
   return (
     <div className="flex h-screen w-screen flex-col">
+      {/* Save toast */}
+      {saveMsg && (
+        <div className="fixed top-4 left-1/2 z-[200] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-xl animate-in fade-in">
+          {saveMsg}
+        </div>
+      )}
+
       {/* Header */}
       <nav className="z-50 flex h-14 shrink-0 items-center justify-between border-b border-slate-200/60 bg-white/90 px-5 backdrop-blur-xl">
         <div className="flex items-center gap-4">
@@ -100,37 +163,47 @@ export default function CreateWorkflow() {
           <div className="flex items-center gap-2">
             <svg className="size-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
             <span className="text-sm font-semibold text-slate-700">{flowName}</span>
+            {status === "Active" && <span className="ml-2 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">LIVE</span>}
+            {status === "Paused" && workflowDbId && <span className="ml-2 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">DRAFT</span>}
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50">
-            Save Draft
+          <button
+            onClick={handleSaveDraft}
+            disabled={saving}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Draft"}
           </button>
-          <button className="rounded-lg bg-linear-to-r from-fuchsia-600 to-violet-600 px-3 py-1.5 text-xs font-bold text-white shadow-lg shadow-violet-500/20 transition-all hover:brightness-110">
-            Deploy
+          <button
+            onClick={handleDeploy}
+            disabled={saving}
+            className="rounded-lg bg-linear-to-r from-fuchsia-600 to-violet-600 px-3 py-1.5 text-xs font-bold text-white shadow-lg shadow-violet-500/20 transition-all hover:brightness-110 disabled:opacity-50"
+          >
+            {saving ? "..." : status === "Active" ? "Update & Deploy" : "Deploy"}
           </button>
           <div ref={userMenuRef} className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-linear-to-br from-cyan-400 to-violet-500 text-[10px] font-bold text-white transition-all hover:shadow-lg hover:shadow-violet-500/25"
             >
-              A
+              {user?.name?.[0]?.toUpperCase() || "U"}
             </button>
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                 <div className="border-b border-slate-100 px-4 py-3">
-                  <p className="text-sm font-bold text-slate-900">Aerth Saraogi</p>
-                  <p className="text-xs text-slate-500">aerth@tradeflow.io</p>
+                  <p className="text-sm font-bold text-slate-900">{user?.name || "User"}</p>
+                  <p className="text-xs text-slate-500">{user?.email || ""}</p>
                 </div>
                 <div className="py-1">
                   <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-700">
                     <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                     My Profile
                   </Link>
-                  <Link to="/login" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
+                  <button onClick={handleLogout} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
                     <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                     Logout
-                  </Link>
+                  </button>
                 </div>
               </div>
             )}
@@ -140,24 +213,24 @@ export default function CreateWorkflow() {
     <div
       className="bg-linear-to-br from-slate-50 via-white to-blue-50 flex-1"
     >
-      {!nodes.length && showTriggerSheet && <TriggerSheet onClose={() => setShowTriggerSheet(false)} onSelect={({type, metadata})=>{
+      {!nodes.length && showTriggerSheet && <TriggerSheet onClose={() => setShowTriggerSheet(false)} onSelect={({type, metadata}:{type: TriggerType, metadata: NodeMetadata})=>{
         setNodes([...nodes,{
           id:Math.random().toString(),
           type,
           data:{
-            kind: "trigger",
+            kind: "trigger" as NodeKind,
             metadata,
           },
           position:{x:0,y:0}
         }])
       }} />}
-      {selectAction && <ActionSheet onClose={() => setSelectAction(null)} onSelect={({type, metadata})=>{
+      {selectAction && <ActionSheet onClose={() => setSelectAction(null)} onSelect={({type, metadata}:{type: ActionType, metadata: NodeMetadata})=>{
         const newNodeId = Math.random().toString();
         setNodes([...nodes,{
           id: newNodeId,
           type,
           data:{
-            kind: "action",
+            kind: "action" as NodeKind,
             metadata,
           },
           position: selectAction.position
@@ -208,5 +281,13 @@ export default function CreateWorkflow() {
       )}
     </div>
     </div>
+  );
+}
+
+export default function CreateWorkflow() {
+  return (
+    <ReactFlowProvider>
+      <CreateWorkflowInner />
+    </ReactFlowProvider>
   );
 }

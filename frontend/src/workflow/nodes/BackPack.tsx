@@ -1,14 +1,14 @@
 import { Handle, Position } from "@xyflow/react";
-import type { TradingMetadata } from "./Lighter";
+import type { TradingMetadata } from "@tradeflow/common";
 
 
-export function Hyperliquid({data}:{
+export function Backpack({data}:{
     data:{
         metadata:TradingMetadata
     }
 }){
-    return <div className="min-w-50 rounded-xl border border-cyan-200 bg-white/90 p-4 shadow-sm backdrop-blur">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-600">Hyperliquid Action</div>
+    return <div className="min-w-50 rounded-xl border border-amber-200 bg-white/90 p-4 shadow-sm backdrop-blur">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-600">Backpack Action</div>
         <div className="text-sm text-slate-700">Type: <span className="font-medium text-slate-900">{data.metadata.type}</span></div>
         <div className="text-sm text-slate-700">Qty: <span className="font-medium text-slate-900">{data.metadata.qty}</span></div>
         <div className="text-sm text-slate-700">Symbol: <span className="font-medium text-slate-900">{data.metadata.symbol}</span></div>

@@ -1,4 +1,6 @@
-import type { NodeKind, NodeMetadata } from "./Createworkflow";
+import type { ActionType, NodeMetadata, TradingMetadata } from "@tradeflow/common";
+import { SUPPORTED_ASSETS } from "@tradeflow/common";
+import {  } from "@tradeflow/common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,40 +24,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState } from "react";
-import type { PriceTriggerNodeMetadata } from "@/nodes/triggers/PriceTrigger";
-import type { TimerNodeMetadata } from "@/nodes/triggers/Timer";
-import type { TradingMetadata } from "@/nodes/action/Lighter";
-import { SUPPORTEDASSETS } from "./TriggerSheet";
 
 const SUPPORTEDACTIONS = [
   {
-    id: "hyperliquid",
+    id: "hyperliquid" as const,
     title: "Hyperliquid",
     description:
       "Place a trade on Hyperliquid.",
   },
   {
-    id: "backpack",
+    id: "backpack" as const,
     title: "Backpack",
     description: "Place a trade on Backpack.",
   },
   {
-    id: "lighter",
+    id: "lighter" as const,
     title: "Lighter",
-    description: "Place a trade on Lighter.",}
+    description: "Place a trade on Lighter.",
+  }
 ];
 
-export const ActionSheet = ({
-  onSelect,
-  onClose,
-}: {
-  onSelect: (data: { type: NodeKind; metadata: NodeMetadata }) => void;
-  onClose: () => void;
-}) => {
-  const [metadata, setMetadata] = useState<
-   TradingMetadata |{}
-  >({});
-  const [selectedAction, setselectedAction] = useState(
+export function ActionSheet({ onClose, onSelect }: {
+    onClose: () => void;
+    onSelect: (data: { type: ActionType; metadata: NodeMetadata }) => void;
+}) {
+  const [metadata, setMetadata] = useState<TradingMetadata>({
+    type: "LONG",
+    qty: 0,
+    symbol: "SOL",
+  });
+  const [selectedAction, setselectedAction] = useState<ActionType>(
     SUPPORTEDACTIONS[1].id,
   );
   return (
@@ -70,7 +68,7 @@ export const ActionSheet = ({
         <div className="mt-5 space-y-4">
         <Select
           value={selectedAction}
-          onValueChange={(value) => setselectedAction(value)}
+          onValueChange={(value) => setselectedAction(value as ActionType)}
         >
           <SelectTrigger className="w-full rounded-lg border-slate-300">
             <SelectValue placeholder="Select an action" />
@@ -90,25 +88,23 @@ export const ActionSheet = ({
                 Type
             </div>
             <Select
-              value={metadata?.type}
+              value={metadata.type}
               onValueChange={(value) =>
-                setMetadata((metadata) => {
-                  return {
-                    ...metadata,
-                    type: value,
-                  };
-                })
+                setMetadata((prev) => ({
+                  ...prev,
+                  type: value as TradingMetadata["type"],
+                }))
               }
             >
               <SelectTrigger className="w-full rounded-lg border-slate-300 bg-white">
-                <SelectValue placeholder="Select an symbol" />
+                <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                      <SelectItem value={"long"}>
+                      <SelectItem value={"LONG"}>
                         Long
                       </SelectItem>
-                      <SelectItem value={"short"}>
+                      <SelectItem value={"SHORT"}>
                         Short
                       </SelectItem>
                 </SelectGroup>
@@ -118,22 +114,20 @@ export const ActionSheet = ({
                 Symbol
             </div>
             <Select
-              value={metadata?.symbol}
+              value={metadata.symbol}
               onValueChange={(value) =>
-                setMetadata((metadata) => {
-                  return {
-                    ...metadata,
-                    symbol: value,
-                  };
-                })
+                setMetadata((prev) => ({
+                  ...prev,
+                  symbol: value,
+                }))
               }
             >
               <SelectTrigger className="w-full rounded-lg border-slate-300 bg-white">
-                <SelectValue placeholder="Select an quantity" />
+                <SelectValue placeholder="Select a symbol" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                     {SUPPORTEDASSETS.map((asset) => <SelectItem key={asset} value={asset}>{asset}</SelectItem>)}
+                     {SUPPORTED_ASSETS.map((asset) => <SelectItem key={asset} value={asset}>{asset}</SelectItem>)}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -142,14 +136,12 @@ export const ActionSheet = ({
             </div>
             <Input
               className="rounded-lg border-slate-300 bg-white"
-              value={metadata.time}
+              value={metadata.qty}
               onChange={(e) =>
-                setMetadata((metadata) => {
-                  return {
-                    ...metadata,
-                    qty: Number(e.target.value),
-                  };
-                })
+                setMetadata((prev) => ({
+                  ...prev,
+                  qty: Number(e.target.value),
+                }))
               }
             ></Input>
             </div>}

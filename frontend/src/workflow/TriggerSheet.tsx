@@ -1,4 +1,5 @@
-import type { NodeKind, NodeMetadata } from "./Createworkflow";
+import type { NodeKind, } from "@tradeflow/common";
+import { SUPPORTED_ASSETS } from "@tradeflow/common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,38 +23,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState } from "react";
-import type { PriceTriggerNodeMetadata } from "@/nodes/triggers/PriceTrigger";
-import type { TimerNodeMetadata } from "@/nodes/triggers/Timer";
+import type { PriceTriggerNodeMetadata, TimerNodeMetadata } from "@tradeflow/common";
+import type { TriggerType, NodeMetadata } from "@tradeflow/common";
 
 const SUPPORTEDTRIGGERS = [
   {
-    id: "price-trigger",
+    id: "price-trigger" as const,
     title: "Price Trigger",
     description:
       "Runs whenever the price goes above or below a certain threshold.",
   },
   {
-    id: "timer",
+    id: "timer" as const,
     title: "Timer",
     description: "Runs at a specific time or on a recurring schedule.",
   },
 ];
 export const SUPPORTEDASSETS = ["SOL", "BTC", "ETH"];
-export const TriggerSheet = ({
-  onSelect,
-  onClose,
-}: {
-  onSelect: (data: { type: NodeKind; metadata: NodeMetadata }) => void;
+export function TriggerSheet({ onClose, onSelect }: {
   onClose: () => void;
-}) => {
+  onSelect: (data: { type: TriggerType; metadata: NodeMetadata }) => void;
+}) {
   const [metadata, setMetadata] = useState<
     PriceTriggerNodeMetadata | TimerNodeMetadata
   >({
     time: 3600,
   });
-  const [selectedTrigger, setSelectedTrigger] = useState<NodeKind>(
-    SUPPORTEDTRIGGERS[1].id as NodeKind,
-  );
+  const [selectedTrigger, setSelectedTrigger] = useState<TriggerType>("timer");
   return (
     <Sheet open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent className="w-105 border-l border-slate-200 bg-white/95 p-6 backdrop-blur">
@@ -66,7 +62,7 @@ export const TriggerSheet = ({
         <div className="mt-5 space-y-4">
         <Select
           value={selectedTrigger}
-          onValueChange={(value) => setSelectedTrigger(value)}
+          onValueChange={(value) => setSelectedTrigger(value as TriggerType)}
         >
           <SelectTrigger className="w-full rounded-lg border-slate-300">
             <SelectValue placeholder="Select a trigger" />
@@ -85,7 +81,7 @@ export const TriggerSheet = ({
             <div className="text-sm font-medium text-slate-700">Number of seconds after which to run the timer</div>
             <Input
               className="rounded-lg border-slate-300 bg-white"
-              value={metadata.time}
+              value={"time" in metadata ? metadata.time : ""}
               onChange={(e) =>
                 setMetadata((metadata) => {
                   return {
@@ -111,7 +107,7 @@ export const TriggerSheet = ({
             />
             <div className="pt-1 text-sm font-medium text-slate-700">Assets</div>
             <Select
-              value={metadata.asset}
+              value={"asset" in metadata ? metadata.asset : ""}
               onValueChange={(value) =>
                 setMetadata((metadata) => {
                   return {
@@ -126,7 +122,7 @@ export const TriggerSheet = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {SUPPORTEDASSETS.map((asset) => (
+                  {SUPPORTED_ASSETS.map((asset) => (
                     <SelectItem key={asset} value={asset}>
                       {asset}
                     </SelectItem>

@@ -1,0 +1,16 @@
+{
+  "name": "@tradeflow/common",
+  "version": "1.0.0",
+  "description": "Common package for shared types and utilities.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^4.0.0"
+  },
+  "license": "MIT"
+}

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fetchWorkflows, getStoredUser, isLoggedIn, logout, createWorkflow, deleteWorkflow } from "@/lib/api";
 
 const WEEKLY_DATA = [
   { day: "Mon", value: 42 },
@@ -28,14 +29,6 @@ const EXCHANGE_DIST = [
   { name: "Hyperliquid", pct: 45, color: "#06b6d4" },
   { name: "Backpack", pct: 30, color: "#f59e0b" },
   { name: "Lighter", pct: 25, color: "#10b981" },
-];
-
-const WORKFLOWS = [
-  { id: 1, name: "BTC Momentum Scalper", status: "Active", exchange: "Hyperliquid", pnl: "+$1,240", runs: 342 },
-  { id: 2, name: "ETH Grid Bot", status: "Active", exchange: "Backpack", pnl: "+$890", runs: 189 },
-  { id: 3, name: "SOL DCA Strategy", status: "Paused", exchange: "Lighter", pnl: "+$456", runs: 78 },
-  { id: 4, name: "ARB Breakout Hunter", status: "Active", exchange: "Hyperliquid", pnl: "-$120", runs: 56 },
-  { id: 5, name: "DOGE Reversal Catcher", status: "Stopped", exchange: "Backpack", pnl: "+$2,100", runs: 412 },
 ];
 
 function BarChart() {
@@ -154,8 +147,17 @@ export default function Dashboard() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [flowName, setFlowName] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [workflows, setWorkflows] = useState<any[]>([]);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const user = getStoredUser();
+
+  useEffect(() => {
+    if (!isLoggedIn()) { navigate("/login"); return; }
+    fetchWorkflows()
+      .then(setWorkflows)
+      .catch(() => {});
+  }, [navigate]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -167,12 +169,25 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleCreateFlow = () => {
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const handleCreateFlow = async () => {
     if (flowName.trim()) {
       navigate(`/createflow?name=${encodeURIComponent(flowName.trim())}`);
       setShowNameModal(false);
       setFlowName("");
     }
+  };
+
+  const handleDeleteWorkflow = async (id: string) => {
+    if (!confirm("Delete this workflow?")) return;
+    try {
+      await deleteWorkflow(id);
+      setWorkflows((prev) => prev.filter((w) => w.id !== id));
+    } catch {}
   };
 
   return (
@@ -225,6 +240,11 @@ export default function Dashboard() {
             <span className="text-xl font-bold tracking-tight text-slate-900">TradeFlow</span>
           </div>
           <div className="flex items-center gap-3">
+              <Link to="/executor">
+                <Button variant="outline" className="rounded-xl border-cyan-200 px-5 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
+                  ⚡ Executor
+                </Button>
+              </Link>
               <Button onClick={() => setShowNameModal(true)} className="rounded-xl bg-linear-to-r from-fuchsia-600 to-violet-600 px-5 text-sm font-bold text-white shadow-lg shadow-violet-500/25 transition-all hover:shadow-xl hover:brightness-110">
                 + New Workflow
               </Button>
@@ -233,23 +253,23 @@ export default function Dashboard() {
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-linear-to-br from-cyan-400 to-violet-500 text-xs font-bold text-white transition-all hover:shadow-lg hover:shadow-violet-500/25"
               >
-                A
+                {user?.name?.[0]?.toUpperCase() || "U"}
               </button>
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                   <div className="border-b border-slate-100 px-4 py-3">
-                    <p className="text-sm font-bold text-slate-900">Aerth Saraogi</p>
-                    <p className="text-xs text-slate-500">aerth@tradeflow.io</p>
+                    <p className="text-sm font-bold text-slate-900">{user?.name || "User"}</p>
+                    <p className="text-xs text-slate-500">{user?.email || ""}</p>
                   </div>
                   <div className="py-1">
                     <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-700">
                       <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                       My Profile
                     </Link>
-                    <Link to="/login" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
+                    <button onClick={handleLogout} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
                       <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                       Logout
-                    </Link>
+                    </button>
                   </div>
                 </div>
               )}
@@ -274,10 +294,10 @@ export default function Dashboard() {
         {/* Stat cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Total Workflows", value: "12", icon: "\u26a1", gradient: "from-violet-500 to-fuchsia-500" },
-            { label: "Total Executions", value: "1,077", icon: "\ud83d\udd04", gradient: "from-cyan-500 to-blue-500" },
-            { label: "Total P&L", value: "+$4,566", icon: "\ud83d\udcb0", gradient: "from-emerald-500 to-teal-500" },
-            { label: "Success Rate", value: "94.2%", icon: "\ud83c\udfaf", gradient: "from-amber-500 to-orange-500" },
+            { label: "Total Workflows", value: String(workflows.length), icon: "\u26a1", gradient: "from-violet-500 to-fuchsia-500" },
+            { label: "Total Executions", value: String(workflows.reduce((a, w) => a + (w.runs || 0), 0)), icon: "\ud83d\udd04", gradient: "from-cyan-500 to-blue-500" },
+            { label: "Total P&L", value: workflows.length ? workflows.map(w => w.pnl || "$0").join(", ") : "$0", icon: "\ud83d\udcb0", gradient: "from-emerald-500 to-teal-500" },
+            { label: "Active", value: String(workflows.filter(w => w.status === "Active").length), icon: "\ud83c\udfaf", gradient: "from-amber-500 to-orange-500" },
           ].map((s) => (
             <div key={s.label} className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-violet-500/5">
               <div className={`flex size-12 items-center justify-center rounded-xl bg-linear-to-br ${s.gradient} text-xl shadow-lg`}>
@@ -323,28 +343,18 @@ export default function Dashboard() {
         {/* Quick actions */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           {[
-            { title: "Create Workflow", desc: "Build a new automated trading strategy", icon: "\u2795", gradient: "from-fuchsia-600 to-violet-600", link: "#", action: () => setShowNameModal(true) },
-            { title: "View Analytics", desc: "Deep dive into your trading performance", icon: "\ud83d\udcca", gradient: "from-cyan-500 to-blue-600", link: "#" },
-            { title: "Manage Keys", desc: "Connect and manage exchange API keys", icon: "\ud83d\udd11", gradient: "from-amber-500 to-orange-600", link: "#" },
+            { title: "Create Workflow", desc: "Build a new automated trading strategy", icon: "\u2795", gradient: "from-fuchsia-600 to-violet-600", link: "", action: () => setShowNameModal(true) },
+            { title: "View Analytics", desc: "Deep dive into your trading performance", icon: "\ud83d\udcca", gradient: "from-cyan-500 to-blue-600", link: "/executor" },
+            { title: "Manage Keys", desc: "Connect and manage exchange API keys", icon: "\ud83d\udd11", gradient: "from-amber-500 to-orange-600", link: "/profile" },
           ].map((a) => (
             <div
               key={a.title}
-              onClick={() => { if ('action' in a && a.action) a.action(); }}
+              onClick={() => { if ('action' in a && a.action) { a.action(); } else if (a.link) { navigate(a.link); } }}
               className="group cursor-pointer rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-violet-500/5"
             >
-              {a.link !== "#" ? (
-                <Link to={a.link} className="block">
-                  <div className={`flex size-12 items-center justify-center rounded-xl bg-linear-to-br ${a.gradient} text-xl text-white shadow-lg`}>{a.icon}</div>
-                  <h4 className="mt-4 text-base font-bold text-slate-900 group-hover:text-violet-700">{a.title}</h4>
-                  <p className="mt-1 text-sm text-slate-500">{a.desc}</p>
-                </Link>
-              ) : (
-                <>
-                  <div className={`flex size-12 items-center justify-center rounded-xl bg-linear-to-br ${a.gradient} text-xl text-white shadow-lg`}>{a.icon}</div>
-                  <h4 className="mt-4 text-base font-bold text-slate-900 group-hover:text-violet-700">{a.title}</h4>
-                  <p className="mt-1 text-sm text-slate-500">{a.desc}</p>
-                </>
-              )}
+              <div className={`flex size-12 items-center justify-center rounded-xl bg-linear-to-br ${a.gradient} text-xl text-white shadow-lg`}>{a.icon}</div>
+              <h4 className="mt-4 text-base font-bold text-slate-900 group-hover:text-violet-700">{a.title}</h4>
+              <p className="mt-1 text-sm text-slate-500">{a.desc}</p>
             </div>
           ))}
         </div>
@@ -353,11 +363,7 @@ export default function Dashboard() {
         <div className="rounded-2xl border border-slate-200/60 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 p-6">
             <h3 className="text-lg font-bold text-slate-900">Your Workflows</h3>
-            <Link to="/createflow">
-              <Button variant="outline" className="rounded-xl border-violet-200 text-sm font-bold text-violet-700 hover:bg-violet-50">
-                View all
-              </Button>
-            </Link>
+            <span className="text-sm text-slate-400">{workflows.length} workflow{workflows.length !== 1 ? "s" : ""}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -368,16 +374,39 @@ export default function Dashboard() {
                   <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Exchange</th>
                   <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">P&amp;L</th>
                   <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Runs</th>
+                  <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {WORKFLOWS.map((w) => (
-                  <tr key={w.id} className="border-b border-slate-50 transition-colors hover:bg-violet-50/30">
+                {workflows.length === 0 ? (
+                  <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-400">No workflows yet. Create your first one!</td></tr>
+                ) : workflows.map((w) => (
+                  <tr
+                    key={w.id}
+                    onClick={() => navigate(`/workflow/${w.id}`)}
+                    className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-violet-50/30"
+                  >
                     <td className="px-6 py-4 text-sm font-semibold text-slate-900">{w.name}</td>
                     <td className="px-6 py-4"><StatusBadge status={w.status} /></td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-600">{w.exchange}</td>
-                    <td className={`px-6 py-4 text-sm font-bold ${w.pnl.startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>{w.pnl}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-500">{w.runs}</td>
+                    <td className={`px-6 py-4 text-sm font-bold ${(w.pnl || "").startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>{w.pnl || "$0"}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-500">{w.runs || 0}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => navigate(`/workflow/${w.id}`)}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-violet-600 shadow-sm transition-all hover:bg-violet-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteWorkflow(w.id)}
+                          className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 shadow-sm transition-all hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -389,10 +418,10 @@ export default function Dashboard() {
       {/* Footer */}
       <footer className="border-t border-slate-200/60 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-10">
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start sm:justify-between">
             {/* Brand */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
+            <div className="space-y-4 text-center sm:text-left">
+              <div className="flex items-center justify-center gap-3 sm:justify-start">
                 <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-fuchsia-500 to-violet-600 text-xs font-black text-white shadow-lg shadow-fuchsia-500/25">
                   TF
                 </div>
@@ -400,41 +429,25 @@ export default function Dashboard() {
               </div>
               <p className="text-sm leading-relaxed text-slate-500">Visual, no-code trading automation for Hyperliquid, Backpack &amp; Lighter.</p>
             </div>
-            {/* Product */}
-            <div>
-              <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">Product</h4>
-              <ul className="space-y-2">
-                {["Workflow Builder", "Analytics", "Integrations", "Pricing"].map((l) => (
-                  <li key={l}><a href="#" className="text-sm font-medium text-slate-600 transition-colors hover:text-violet-600">{l}</a></li>
-                ))}
-              </ul>
-            </div>
-            {/* Company */}
-            <div>
-              <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">Company</h4>
-              <ul className="space-y-2">
-                {["About", "Blog", "Careers", "Contact"].map((l) => (
-                  <li key={l}><a href="#" className="text-sm font-medium text-slate-600 transition-colors hover:text-violet-600">{l}</a></li>
-                ))}
-              </ul>
-            </div>
-            {/* Legal */}
-            <div>
-              <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">Legal</h4>
-              <ul className="space-y-2">
-                {["Privacy Policy", "Terms of Service", "Cookie Policy"].map((l) => (
-                  <li key={l}><a href="#" className="text-sm font-medium text-slate-600 transition-colors hover:text-violet-600">{l}</a></li>
-                ))}
-              </ul>
+            {/* Connect */}
+            <div className="flex items-center gap-5">
+              <a href="https://github.com/AerthSaraogi" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-violet-600">
+                <svg className="size-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                GitHub
+              </a>
+              <a href="https://www.linkedin.com/in/aerth-saraogi/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-violet-600">
+                <svg className="size-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                LinkedIn
+              </a>
+              <a href="mailto:aerthsaraogi9@gmail.com" className="flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-violet-600">
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                Email
+              </a>
             </div>
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-8 sm:flex-row">
             <p className="text-sm text-slate-400">&copy; 2026 TradeFlow. All rights reserved.</p>
-            <div className="flex gap-5">
-              {["Twitter", "GitHub", "Discord"].map((s) => (
-                <a key={s} href="#" className="text-sm font-medium text-slate-400 transition-colors hover:text-violet-600">{s}</a>
-              ))}
-            </div>
+            <p className="text-sm text-slate-400">Built by Aerth Saraogi</p>
           </div>
         </div>
       </footer>
